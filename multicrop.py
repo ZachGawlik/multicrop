@@ -8,6 +8,7 @@ Particularly useful for cropping many screenshots taken of Netflix.
 
 from tkinter import *
 from tkinter import filedialog
+import tkinter as tk
 from PIL import ImageTk, Image
 import os
 import mimetypes
@@ -22,22 +23,62 @@ imgfiles = None
 
 root = Tk(className="Image viewer")
 root.config(bg="black")
-canvas_width = 800
-canvas_height = 600
+canvas_width = 400
+canvas_height = 300
+
+
+class StatusBar(tk.Frame):   
+    def __init__(self, master):
+        tk.Frame.__init__(self, master)
+        self.variable=tk.StringVar()        
+        self.label=tk.Label(self, bd=1, relief=tk.SUNKEN, anchor=tk.W,
+                           textvariable=self.variable,
+                           font=('arial', 14, 'normal'))
+        self.variable.set('Click Open.')
+        self.label.pack(fill=tk.X)        
+        self.pack(side=BOTTOM, fill=tk.X)
+
+    def update(self, newtext):
+        self.variable.set(newtext)
+
+
+class ButtonBar(tk.Frame):
+    def __init__(self, master):
+        tk.Frame.__init__(self, master)
+
+        button = Button(self, text="Open", command=openimage)
+        button.pack(side=LEFT)
+        button_crop = Button(self, text='Crop', command=crop)
+        button_crop.pack(side=LEFT)
+        button_save = Button(self, text='Save All', command=saveimages)
+        button_save.pack(side=LEFT)
+
+        self.pack(side=BOTTOM, fill=X)
+
+
+def allimages(imgfiles):
+    '''Determine if all given, selected files are images.'''
+    for imgfile in imgfiles:
+        if os.path.splitext(imgfile)[1] not in ('.png', 'jpg', 'jpeg'):
+            return False
+    return True
 
 
 def openimage():
     '''Select all images to crop. Display first to screen.'''
     global imgfiles, crops
     try:
+        statusbar.update('1. Select files to crop.'
+                         'Hold command to select multiple.')
         imgfiles = filedialog.askopenfilenames()
         imgfile = imgfiles[0]
-        if imgfile:
+        if imgfile and allimages(imgfiles):
             canvas.pil_img = Image.open(imgfile)
             canvas.config(width=canvas.pil_img.size[0])
             canvas.config(height=canvas.pil_img.size[1])
             setimage(canvas.pil_img)
             crops = []
+            statusbar.update('2. Draw a region to crop.')
     except IOError:
         print('Files selected must be images')
         openimage()
@@ -113,6 +154,7 @@ def crop():
     canvas.config(height=ordered_coords[3]-ordered_coords[1])
     crops.append(ordered_coords)
     crop_coords = None
+    statusbar.update('All images cropped. Crop again or hit Save.')
 
 
 def applyall():
@@ -137,6 +179,9 @@ def saveimages():
         croppedimages, newfilenames = applyall()
         for image, filename in zip(croppedimages, newfilenames):
             image.save(filename)
+        statusbar.update('Saved all images with prefix Multicropped-.')
+    else:
+        statusbar.update('Click Open.')
 
 
 yscrollbar = Scrollbar(root)
@@ -145,19 +190,11 @@ yscrollbar.pack(side=RIGHT, fill=Y)
 xscrollbar = Scrollbar(root, orient=HORIZONTAL)
 xscrollbar.pack(side=BOTTOM, fill=X)
 
-canvas = Canvas(root, #width=canvas_width, height=canvas_height, 
+canvas = Canvas(root, width=canvas_width, height=canvas_height, 
                 yscrollcommand=yscrollbar.set, xscrollcommand=xscrollbar.set)
 
-bottomframe = Frame(root)
-bottomframe.pack(side=BOTTOM, fill=X)
-
-button = Button(bottomframe, text="Open", command=openimage)
-button.pack(side=LEFT)
-button_crop = Button(bottomframe, text='Crop', command=crop)
-button_crop.pack(side=LEFT)
-button_save = Button(bottomframe, text='Save All', command=saveimages)
-button_save.pack(side=LEFT)
-
+statusbar = StatusBar(root)
+bottomframe = ButtonBar(root)
 
 canvas.pack(side=TOP, fill=BOTH, expand=YES)
 yscrollbar.config(command=canvas.yview)
