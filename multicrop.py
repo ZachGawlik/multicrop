@@ -1,7 +1,16 @@
+'''
+Select multiple image of same size that all need cropping in same area.
+Select a region to crop on one image, and apply it to all selected images.
+Saves cropped images with filename prefix 'Multicropped-'
+
+Particularly useful for cropping many screenshots taken of Netflix.
+'''
+
 from tkinter import *
 from tkinter import filedialog
 from PIL import ImageTk, Image
 import os
+import mimetypes
 
 
 b1 = 'up'
@@ -23,18 +32,20 @@ def openimage():
     try:
         imgfiles = filedialog.askopenfilenames()
         imgfile = imgfiles[0]
-        print(imgfile)
         if imgfile:
             canvas.pil_img = Image.open(imgfile)
             canvas.config(width=canvas.pil_img.size[0])
             canvas.config(height=canvas.pil_img.size[1])
-            set_canvas_image(canvas.pil_img)
+            setimage(canvas.pil_img)
             crops = []
     except IOError:
+        print('Files selected must be images')
         openimage()
+    except:
+        pass
 
 
-def set_canvas_image(img):
+def setimage(img):
     '''Set canvas to display only the given image.'''
     canvas.img = ImageTk.PhotoImage(img)
     canvas.create_image(0,0, anchor=NW, image=canvas.img) 
@@ -73,8 +84,10 @@ def motion(event):
             xnew = int(canvas.canvasx(event.x))
             ynew = int(canvas.canvasy(event.y))
             crop_coords = (xold, yold, xnew, ynew)
-            canvas.create_rectangle(*crop_coords, tags='rect', outline='white')
-            canvas.create_rectangle(*crop_coords, tags='rect', dash=(4, 4))
+            canvas.create_rectangle(*crop_coords, tags='rect', 
+                                    width=2, outline='white')
+            canvas.create_rectangle(*crop_coords, tags='rect', 
+                                    width=2, dash=(4, 4))
 
 
 def crop():
@@ -92,10 +105,9 @@ def crop():
             max(crop_coords[1], crop_coords[3]),
             )
 
-    print('Cropping rectangle at ' + str(ordered_coords))
     canvas.delete('rect')
     canvas.pil_img = canvas.pil_img.crop(ordered_coords)
-    set_canvas_image(canvas.pil_img)
+    setimage(canvas.pil_img)
 
     canvas.config(width=ordered_coords[2]-ordered_coords[0])
     canvas.config(height=ordered_coords[3]-ordered_coords[1])
@@ -124,8 +136,7 @@ def saveimages():
     if hasattr(canvas, 'pil_img'):
         croppedimages, newfilenames = applyall()
         for image, filename in zip(croppedimages, newfilenames):
-            image.save(filename)   
-
+            image.save(filename)
 
 
 yscrollbar = Scrollbar(root)
@@ -134,13 +145,18 @@ yscrollbar.pack(side=RIGHT, fill=Y)
 xscrollbar = Scrollbar(root, orient=HORIZONTAL)
 xscrollbar.pack(side=BOTTOM, fill=X)
 
-canvas = Canvas(root, width=canvas_width, height=canvas_height, yscrollcommand=yscrollbar.set, xscrollcommand=xscrollbar.set)
-button = Button(root, text="Open", command=openimage)
-button.pack(side=BOTTOM)
-button_save = Button(root, text='Save', command=saveimages)
-button_save.pack(side=BOTTOM)
-button_crop = Button(root, text='Crop', command=crop)
-button_crop.pack(side=BOTTOM)
+canvas = Canvas(root, #width=canvas_width, height=canvas_height, 
+                yscrollcommand=yscrollbar.set, xscrollcommand=xscrollbar.set)
+
+bottomframe = Frame(root)
+bottomframe.pack(side=BOTTOM, fill=X)
+
+button = Button(bottomframe, text="Open", command=openimage)
+button.pack(side=LEFT)
+button_crop = Button(bottomframe, text='Crop', command=crop)
+button_crop.pack(side=LEFT)
+button_save = Button(bottomframe, text='Save All', command=saveimages)
+button_save.pack(side=LEFT)
 
 
 canvas.pack(side=TOP, fill=BOTH, expand=YES)
