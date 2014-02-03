@@ -1,13 +1,15 @@
 from tkinter import *
 from tkinter import filedialog
 from PIL import ImageTk, Image
+import os
 
 
 b1 = 'up'
 xold = None
 yold = None
 crop_coords = None
-imgfile = None
+crops = []
+imgfiles = None
 
 root = Tk(className="Image viewer")
 root.config(bg="black")
@@ -16,17 +18,24 @@ canvas_height = 600
 
 
 def openimage():
-    global imgfile
-    imgfile = filedialog.askopenfilename()
-    if imgfile:
-        canvas.pil_img = Image.open(imgfile)
-        canvas.config(width=canvas.pil_img.size[0])
-        canvas.config(height=canvas.pil_img.size[1])
-        set_canvas_image(canvas.pil_img)
+    '''Select all images to crop. Display first to screen.'''
+    global imgfiles, crops
+    try:
+        imgfiles = filedialog.askopenfilenames()
+        imgfile = imgfiles[0]
+        print(imgfile)
+        if imgfile:
+            canvas.pil_img = Image.open(imgfile)
+            canvas.config(width=canvas.pil_img.size[0])
+            canvas.config(height=canvas.pil_img.size[1])
+            set_canvas_image(canvas.pil_img)
+            crops = []
+    except IOError:
+        openimage()
 
 
 def set_canvas_image(img):
-    '''Set given img to be in canvas. Change canvas around it'''
+    '''Set canvas to display only the given image.'''
     canvas.img = ImageTk.PhotoImage(img)
     canvas.create_image(0,0, anchor=NW, image=canvas.img) 
     
@@ -35,6 +44,7 @@ def set_canvas_image(img):
 
 
 def b1down(event):
+    '''Left mouse down event. Initiate rectangle drawing.'''
     global b1, xold, yold
     canvas = event.widget
     x = int(canvas.canvasx(event.x))
@@ -46,6 +56,7 @@ def b1down(event):
 
 
 def b1up(event):
+    '''Left mouse up event. End rectangle drawing.'''
     global b1, xold, yold
     b1 = 'up'
     xold = None
@@ -53,6 +64,7 @@ def b1up(event):
 
 
 def motion(event):
+    '''Mouse movement event. Create rectangle while left mouse held down.'''
     global crop_coords
     if b1 == 'down':
         global xold, yold
@@ -61,17 +73,18 @@ def motion(event):
             xnew = int(canvas.canvasx(event.x))
             ynew = int(canvas.canvasy(event.y))
             crop_coords = (xold, yold, xnew, ynew)
-            canvas.create_rectangle(*crop_coords, tags='rect')
+            canvas.create_rectangle(*crop_coords, tags='rect', outline='white')
+            canvas.create_rectangle(*crop_coords, tags='rect', dash=(4, 4))
 
 
 def crop():
+    '''Crop image on canvas according to created rectangle'''
     global crop_coords
-    global imgfile
     
     if crop_coords is None or not hasattr(canvas, 'pil_img'):
         return
 
-    # order the cropping rectangle's coordinates to be left, top, right, bottom
+    # order the rectangle's coordinates to be (left, top, right, bottom)
     ordered_coords = (
             min(crop_coords[0], crop_coords[2]),
             min(crop_coords[1], crop_coords[3]),
@@ -86,12 +99,33 @@ def crop():
 
     canvas.config(width=ordered_coords[2]-ordered_coords[0])
     canvas.config(height=ordered_coords[3]-ordered_coords[1])
+    crops.append(ordered_coords)
     crop_coords = None
 
 
-def saveimage():
+def applyall():
+    '''Apply all crops to all selected image files.'''
+    global imgfiles
+    global crops
+    croppedimages = [canvas.pil_img]
+    newfilenames = ['/Multicropped-'.join(os.path.split(imgfiles[0]))]
+    for imgfile in imgfiles[1:]:  # imgfiles[0] already cropped.
+        image = Image.open(imgfile)
+        for cropping in crops:
+            image = image.crop(cropping)
+        croppedimages.append(image)
+        newfilenames.append('/Multicropped-'.join(os.path.split(imgfile)))
+
+    return croppedimages, newfilenames
+
+
+def saveimages():
+    '''Save each cropped image.'''
     if hasattr(canvas, 'pil_img'):
-        canvas.pil_img.save('CROPPEDIMAGE.PNG')
+        croppedimages, newfilenames = applyall()
+        for image, filename in zip(croppedimages, newfilenames):
+            image.save(filename)   
+
 
 
 yscrollbar = Scrollbar(root)
@@ -103,7 +137,7 @@ xscrollbar.pack(side=BOTTOM, fill=X)
 canvas = Canvas(root, width=canvas_width, height=canvas_height, yscrollcommand=yscrollbar.set, xscrollcommand=xscrollbar.set)
 button = Button(root, text="Open", command=openimage)
 button.pack(side=BOTTOM)
-button_save = Button(root, text='Save', command=saveimage)
+button_save = Button(root, text='Save', command=saveimages)
 button_save.pack(side=BOTTOM)
 button_crop = Button(root, text='Crop', command=crop)
 button_crop.pack(side=BOTTOM)
