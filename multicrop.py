@@ -12,11 +12,6 @@ from PIL import ImageTk, Image
 import os
 
 
-crop_coords = None
-canvas_width = 400
-canvas_height = 300
-
-
 class StatusBar(tk.Frame):
     '''Instructional status bar along bottom.'''   
     def __init__(self, master):
@@ -30,6 +25,7 @@ class StatusBar(tk.Frame):
         self.pack(side=tk.BOTTOM, fill=tk.X)
 
     def update(self, newtext):
+        '''Update text displayed in statusbar.'''
         self.variable.set(newtext)
 
 
@@ -44,12 +40,11 @@ class ButtonBar(tk.Frame):
         button_crop.pack(side=tk.LEFT)
         button_save = tk.Button(self, text='Save All', command=self.saveimages)
         button_save.pack(side=tk.LEFT)
+        self.pack(side=tk.BOTTOM, fill=tk.X)
 
         self.canvas = self.master.canvas
         self.imgfiles = None
         self.crops = []
-
-        self.pack(side=tk.BOTTOM, fill=tk.X)
 
     def openimage(self):
         '''Select all images to crop. Display first to screen.'''
@@ -79,10 +74,9 @@ class ButtonBar(tk.Frame):
         self.canvas.configure(scrollregion=region)
 
     def crop(self):
+        crop_coords = self.master.crop_coords
         '''Crop image on canvas according to created rectangle'''
-        global crop_coords
-        
-        if crop_coords is None or not hasattr(self.canvas, 'pil_img'):
+        if not (crop_coords and hasattr(self.canvas, 'pil_img')):
             return
 
         # order the rectangle's coordinates to be (left, top, right, bottom)
@@ -100,7 +94,7 @@ class ButtonBar(tk.Frame):
         self.canvas.config(width=ordered_coords[2]-ordered_coords[0])
         self.canvas.config(height=ordered_coords[3]-ordered_coords[1])
         self.crops.append(ordered_coords)
-        crop_coords = None
+        self.master.crop_coords = None
         self.master.statusbar.update('All images cropped. Crop again or Save.')
 
     def applyall(self):
@@ -143,11 +137,12 @@ class MulticropApplication(tk.Frame):
                                 yscrollcommand=yscrollbar.set, 
                                 xscrollcommand=xscrollbar.set)
 
-        self.statusbar = StatusBar(self)
-        self.bottomframe = ButtonBar(self)
         self.b1 = 'up'
         self.xold = None
         self.yold = None
+        self.crop_coords = None
+        self.statusbar = StatusBar(self)
+        self.bottomframe = ButtonBar(self)
 
         self.canvas.pack(side=tk.TOP, fill=tk.BOTH, expand=tk.YES)
         yscrollbar.config(command=self.canvas.yview)
@@ -163,7 +158,6 @@ class MulticropApplication(tk.Frame):
         y = int(self.canvas.canvasy(event.y))
         self.xold = x
         self.yold = y
-
         self.b1 = 'down'
 
     def b1up(self, event):
@@ -174,16 +168,15 @@ class MulticropApplication(tk.Frame):
 
     def motion(self, event):
         '''Mouse movement event. Create rectangle while mouse held down.'''
-        global crop_coords
         if self.b1 == 'down':
             if self.xold is not None and self.yold is not None:
                 self.canvas.delete('rect')
                 xnew = int(self.canvas.canvasx(event.x))
                 ynew = int(self.canvas.canvasy(event.y))
-                crop_coords = (self.xold, self.yold, xnew, ynew)
-                self.canvas.create_rectangle(*crop_coords, tags='rect', 
+                self.crop_coords = (self.xold, self.yold, xnew, ynew)
+                self.canvas.create_rectangle(*self.crop_coords, tags='rect', 
                                         width=2, outline='white')
-                self.canvas.create_rectangle(*crop_coords, tags='rect', 
+                self.canvas.create_rectangle(*self.crop_coords, tags='rect', 
                                         width=2, dash=(4, 4))
 
 
